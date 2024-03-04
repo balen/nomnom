@@ -6,8 +6,8 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser, Permission
 from django.test import RequestFactory
-from model_bakery import baker
-from nominate import models, reports
+from freezegun import freeze_time
+from nominate import factories, models, reports
 
 pytestmark = pytest.mark.usefixtures("db")
 
@@ -41,6 +41,21 @@ def test_report_is_empty_when_election_is_empty(
     )
 
 
+@freeze_time("2022-09-01")
+def test_report_filename_contains_data(nominations_report: reports.NominationsReport):
+    assert "2022-09-01" in nominations_report.get_filename()
+
+
+def test_report_filename_includes_election_slug(
+    election: models.Election, nominations_report: reports.NominationsReport
+):
+    assert election.slug in nominations_report.get_filename()
+
+
+def test_report_filename_extension(nominations_report: reports.NominationsReport):
+    assert nominations_report.get_filename().endswith(".csv")
+
+
 def test_report_contains_nomination(
     nominations_report: reports.NominationsReport,
     nomination: models.Nomination,
@@ -54,7 +69,7 @@ def test_report_contains_nomination(
 def test_report_doesnt_contain_nomination_from_other_election(
     nominations_report: reports.NominationsReport,
 ):
-    baker.make("nominate.Nomination")
+    factories.NominationFactory.create()
 
     assert (
         nominations_report.get_report_content()
@@ -80,8 +95,7 @@ def make_nomination(db, user, category):
     nominator = models.NominatingMemberProfile.objects.create(
         user=user, preferred_name="Test User", member_number="123"
     )
-    return baker.make("nominate.Nomination", nominator=nominator, category=category)
-    # return models.Nomination.objects.create(nominator=nominator, category=category)
+    return factories.NominationFactory(nominator=nominator, category=category)
 
 
 @pytest.fixture
